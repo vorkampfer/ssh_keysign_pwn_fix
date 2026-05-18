@@ -15,3 +15,28 @@
 
 ## Build
 `gcc -Wall -Wextra -Werror -O2 sshkeysign_pwn_fix.c -o sshkeysign_pwn_fix`
+## Example:
+```
+ᐅ sudo ./sshkeysign_pwn_fix apply-low-risk
+[apply] removed suid/sgid from /usr/bin/chage
+[apply] set kernel.yama.ptrace_scope=3 (runtime)
+[apply] wrote persistent sysctl drop-in: /etc/sysctl.d/99-sshkeysign-pwn-fix.conf
+[apply] low-risk mode: ssh-keysign permissions were not modified
+[apply] complete. Reboot not required for file mode changes.
+[apply] kernel update is still required for full remediation.
+
+ᐅ sudo ./sshkeysign_pwn_fix status
+[sudo] password for scottx0beam:
+== sshkeysign-pwn mitigation status ==
+[status] ssh-keysign /usr/libexec/ssh-keysign : not found
+[status] ssh-keysign /usr/libexec/openssh/ssh-keysign : not found
+[status] ssh-keysign /usr/lib/ssh/ssh-keysign : mode=4711 suid
+[status] ssh-keysign /usr/lib/openssh/ssh-keysign : not found
+[status] chage       /usr/bin/chage : mode=0755
+[status] kernel.yama.ptrace_scope = 3
+[status] state file present: /var/lib/sshkeysign-pwn-fix/state
+[status] sysctl drop-in present: /etc/sysctl.d/99-sshkeysign-pwn-fix.conf
+
+[IOC] UID 0 accounts in /etc/passwd:
+  - root:x:0:0::/root:/usr/bin/zsh
+```
