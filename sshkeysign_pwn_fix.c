@@ -22,6 +22,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/utsname.h>
 #include <unistd.h>
 
 #define STATE_FILE "/var/lib/sshkeysign-pwn-fix/state"
@@ -48,6 +49,7 @@ static void usage(const char *prog)
 		"\n"
 		"Modes:\n"
 		"  status          Show current mitigation and risk state\n"
+		"  check-patch     Heuristic check for likely patched kernel status\n"
 		"  --apply-fullfix Full hardening (includes ssh-keysign + chage + ptrace)\n"
 		"                 : warns and requires interactive y/yes confirmation\n"
 		"  apply           Alias of --apply-fullfix (kept for compatibility)\n"
@@ -57,10 +59,87 @@ static void usage(const char *prog)
 		"\n"
 		"Examples:\n"
 		"  sudo %s status\n"
+		"  %s check-patch\n"
 		"  sudo %s --apply-fullfix\n"
 		"  sudo %s apply-low-risk\n"
 		"  sudo %s rollback\n",
-		prog, prog, prog, prog, prog);
+		prog, prog, prog, prog, prog, prog);
+}
+
+static int parse_release_triplet(const char *release, int *maj, int *min, int *pat)
+{
+	int a = 0;
+	int b = 0;
+	int c = 0;
+
+	if (sscanf(release, "%d.%d.%d", &a, &b, &c) != 3)
+		return -1;
+
+	*maj = a;
+	*min = b;
+	*pat = c;
+	return 0;
+}
+
+static int compare_triplet(int a1, int b1, int c1, int a2, int b2, int c2)
+{
+	if (a1 != a2)
+		return (a1 > a2) ? 1 : -1;
+	if (b1 != b2)
+		return (b1 > b2) ? 1 : -1;
+	if (c1 != c2)
+		return (c1 > c2) ? 1 : -1;
+	return 0;
+}
+
+static int do_check_patch(void)
+{
+	struct utsname u;
+	int maj;
+	int min;
+	int pat;
+	bool distro_kernel = false;
+
+	if (uname(&u) < 0) {
+		perror("uname");
+		return 1;
+	}
+
+	printf("== kernel patch heuristic (CVE-2026-46333) ==\n");
+	printf("[check] uname -r: %s\n", u.release);
+	printf("[check] uname -v: %s\n", u.version);
+
+	if (strstr(u.release, "ubuntu") || strstr(u.release, "debian") || strstr(u.release, "el") ||
+	    strstr(u.release, "amzn") || strstr(u.release, "suse") || strstr(u.release, "generic") ||
+	    strstr(u.release, "arch")) {
+		distro_kernel = true;
+	}
+
+	if (parse_release_triplet(u.release, &maj, &min, &pat) != 0) {
+		puts("[result] unknown: could not parse kernel version triplet");
+		puts("[note] Use distro changelog/security advisories for CVE-2026-46333 confirmation.");
+		return 0;
+	}
+
+	if (!distro_kernel && compare_triplet(maj, min, pat, 7, 0, 7) >= 0) {
+		puts("[result] likely patched (upstream-style version is >= 7.0.7)");
+		puts("[note] Still verify with your distro/kernel changelog if this is not official mainline.");
+		return 0;
+	}
+
+	if (!distro_kernel && compare_triplet(maj, min, pat, 7, 0, 7) < 0) {
+		puts("[result] likely vulnerable unless your vendor backported the fix");
+		puts("[note] Keep mitigations enabled and verify package changelog for CVE-2026-46333.");
+		return 0;
+	}
+
+	if (compare_triplet(maj, min, pat, 7, 0, 7) >= 0)
+		puts("[result] likely patched, but distro backport policy means verify anyway");
+	else
+		puts("[result] unknown-to-risky: version alone is not enough on distro kernels; assume risk until verified");
+
+	puts("[note] Check vendor changelog/security notice for CVE-2026-46333 or commit 31e62c2ebbfd backport.");
+	return 0;
 }
 
 static bool confirm_full_apply(void)
@@ -382,6 +461,8 @@ int main(int argc, char **argv)
 
 	if (strcmp(argv[1], "status") == 0)
 		return do_status();
+	if (strcmp(argv[1], "check-patch") == 0)
+		return do_check_patch();
 	if (strcmp(argv[1], "apply") == 0 || strcmp(argv[1], "--apply-fullfix") == 0)
 		return do_apply(false);
 	if (strcmp(argv[1], "apply-low-risk") == 0)
