@@ -30,18 +30,19 @@ gcc -Wall -Wextra -Werror -O2 sshkeysign_pwn_fix.c -o sshkeysign_pwn_fix
 [apply] complete. Reboot not required for file mode changes.
 [apply] kernel update is still required for full remediation.
 
-ᐅ sudo ./sshkeysign_pwn_fix status
-[sudo] password for scottx0beam:
+ᐅ ./sshkeysign_pwn_fix status
 == sshkeysign-pwn mitigation status ==
+[Note] Linux Kernel 7.0.8 is Released to Fix ssh-keysign-pwn Root Exploitation (CVE-2026-46333)
+[status-flag] kernel-fix-threshold-not-met (< 7.0.8): 7.0.7-arch2-1
 [status] ssh-keysign /usr/libexec/ssh-keysign : not found
 [status] ssh-keysign /usr/libexec/openssh/ssh-keysign : not found
 [status] ssh-keysign /usr/lib/ssh/ssh-keysign : mode=4711 suid
 [status] ssh-keysign /usr/lib/openssh/ssh-keysign : not found
 [status] chage       /usr/bin/chage : mode=0755
 [status] kernel.yama.ptrace_scope = 3
-[status] state file present: /var/lib/sshkeysign-pwn-fix/state
+[status] state file missing: /var/lib/sshkeysign-pwn-fix/state
 [status] sysctl drop-in present: /etc/sysctl.d/99-sshkeysign-pwn-fix.conf
 
 [IOC] UID 0 accounts in /etc/passwd:
-  - root:x:0:0::/root:/usr/bin/zsh
+  - root:x:0:0::/root:/usr/bin/nologin
 ```
