@@ -27,6 +27,9 @@
 
 #define STATE_FILE "/var/lib/sshkeysign-pwn-fix/state"
 #define SYSCTL_FILE "/etc/sysctl.d/99-sshkeysign-pwn-fix.conf"
+#define FIXED_KERNEL_MAJ 7
+#define FIXED_KERNEL_MIN 0
+#define FIXED_KERNEL_PAT 8
 
 struct target {
 	const char *path;
@@ -121,24 +124,25 @@ static int do_check_patch(void)
 		return 0;
 	}
 
-	if (!distro_kernel && compare_triplet(maj, min, pat, 7, 0, 7) >= 0) {
-		puts("[result] likely patched (upstream-style version is >= 7.0.7)");
+	if (!distro_kernel && compare_triplet(maj, min, pat, FIXED_KERNEL_MAJ, FIXED_KERNEL_MIN, FIXED_KERNEL_PAT) >= 0) {
+		puts("[result] likely patched (upstream-style version is >= 7.0.8)");
 		puts("[note] Still verify with your distro/kernel changelog if this is not official mainline.");
 		return 0;
 	}
 
-	if (!distro_kernel && compare_triplet(maj, min, pat, 7, 0, 7) < 0) {
+	if (!distro_kernel && compare_triplet(maj, min, pat, FIXED_KERNEL_MAJ, FIXED_KERNEL_MIN, FIXED_KERNEL_PAT) < 0) {
 		puts("[result] likely vulnerable unless your vendor backported the fix");
 		puts("[note] Keep mitigations enabled and verify package changelog for CVE-2026-46333.");
 		return 0;
 	}
 
-	if (compare_triplet(maj, min, pat, 7, 0, 7) >= 0)
+	if (compare_triplet(maj, min, pat, FIXED_KERNEL_MAJ, FIXED_KERNEL_MIN, FIXED_KERNEL_PAT) >= 0)
 		puts("[result] likely patched, but distro backport policy means verify anyway");
 	else
 		puts("[result] unknown-to-risky: version alone is not enough on distro kernels; assume risk until verified");
 
 	puts("[note] Check vendor changelog/security notice for CVE-2026-46333 or commit 31e62c2ebbfd backport.");
+	puts("[note] Linux Kernel 7.0.8 is Released to Fix ssh-keysign-pwn Root Exploitation (CVE-2026-46333)");
 	return 0;
 }
 
@@ -289,8 +293,21 @@ static void show_target_state(void)
 static int do_status(void)
 {
 	int scope = read_ptrace_scope();
+	struct utsname u;
+	int maj;
+	int min;
+	int pat;
 
 	puts("== sshkeysign-pwn mitigation status ==");
+	puts("[Note] Linux Kernel 7.0.8 is Released to Fix ssh-keysign-pwn Root Exploitation (CVE-2026-46333)");
+	if (uname(&u) == 0 && parse_release_triplet(u.release, &maj, &min, &pat) == 0) {
+		if (compare_triplet(maj, min, pat, FIXED_KERNEL_MAJ, FIXED_KERNEL_MIN, FIXED_KERNEL_PAT) >= 0)
+			printf("[status-flag] kernel-fix-threshold-met (>= %d.%d.%d): %s\n", FIXED_KERNEL_MAJ, FIXED_KERNEL_MIN, FIXED_KERNEL_PAT, u.release);
+		else
+			printf("[status-flag] kernel-fix-threshold-not-met (< %d.%d.%d): %s\n", FIXED_KERNEL_MAJ, FIXED_KERNEL_MIN, FIXED_KERNEL_PAT, u.release);
+	} else {
+		puts("[status-flag] unknown (could not parse uname -r)");
+	}
 	show_target_state();
 
 	if (scope >= 0)
